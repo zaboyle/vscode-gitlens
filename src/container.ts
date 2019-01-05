@@ -5,6 +5,7 @@ import { LineAnnotationController } from './annotations/lineAnnotationController
 import { GitCodeLensController } from './codelens/codeLensController';
 import { Commands, ToggleFileBlameCommandArgs } from './commands';
 import { AnnotationsToggleMode, Config, configuration } from './configuration';
+import { GitDiffContentProvider } from './git/diffContentProvider';
 import { GitFileSystemProvider } from './git/fsProvider';
 import { GitService } from './git/gitService';
 import { LineHoverController } from './hovers/lineHoverController';
@@ -110,6 +111,7 @@ export class Container {
             });
         }
 
+        context.subscriptions.push(new GitDiffContentProvider());
         context.subscriptions.push(new GitFileSystemProvider());
     }
 

@@ -133,6 +133,12 @@ export class ViewCommands implements Disposable {
         commands.registerCommand('gitlens.views.terminalRemoveRemote', this.terminalRemoveRemote, this);
         commands.registerCommand('gitlens.views.terminalCreateTag', this.terminalCreateTag, this);
         commands.registerCommand('gitlens.views.terminalDeleteTag', this.terminalDeleteTag, this);
+
+        commands.registerCommand('gitlens.views.openDiffView', this.openDiffView, this);
+    }
+
+    private openDiffView(node: CommitNode) {
+        return openEditor(GitUri.toDiffUri(node.repoPath, node.ref));
     }
 
     dispose() {

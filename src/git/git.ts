@@ -490,7 +490,7 @@ export class Git {
 
     static async diff(
         repoPath: string,
-        fileName: string,
+        fileName: string | undefined,
         ref1?: string,
         ref2?: string,
         options: { encoding?: string; filter?: string } = {}
@@ -500,15 +500,20 @@ export class Git {
             params.push(`--diff-filter=${options.filter}`);
         }
 
-        if (ref1) {
+        if (ref1 !== undefined) {
             // <sha>^3 signals an untracked file in a stash and if we are trying to find its parent, use the root sha
             if (ref1.endsWith('^3^')) {
                 ref1 = rootSha;
             }
             params.push(Git.isStagedUncommitted(ref1) ? '--staged' : ref1);
         }
-        if (ref2) {
+        if (ref2 !== undefined) {
             params.push(Git.isStagedUncommitted(ref2) ? '--staged' : ref2);
+        }
+
+        params.push('--');
+        if (fileName !== undefined) {
+            params.push(fileName);
         }
 
         const encoding: BufferEncoding = options.encoding === 'utf8' ? 'utf8' : 'binary';
@@ -516,9 +521,7 @@ export class Git {
         try {
             return await git<string>(
                 { cwd: repoPath, configs: ['-c', 'color.diff=false'], encoding: encoding },
-                ...params,
-                '--',
-                fileName
+                ...params
             );
         }
         catch (ex) {
@@ -795,28 +798,45 @@ export class Git {
 
     static async show<TOut extends string | Buffer>(
         repoPath: string | undefined,
-        fileName: string,
+        fileName: string | undefined,
         ref: string,
         options: {
             encoding?: 'binary' | 'ascii' | 'utf8' | 'utf16le' | 'ucs2' | 'base64' | 'latin1' | 'hex' | 'buffer';
+            patch?: boolean;
         } = {}
     ): Promise<TOut | undefined> {
-        const [file, root] = Git.splitPath(fileName, repoPath);
+        if (repoPath === undefined && fileName === undefined) return undefined;
 
         if (Git.isStagedUncommitted(ref)) {
             ref = ':';
         }
         if (Git.isUncommitted(ref)) throw new Error(`ref=${ref} is uncommitted`);
 
+        const params = [];
+        if (options.patch) {
+            params.push('-p');
+        }
+
+        let file;
+        let root;
+        if (fileName === undefined) {
+            root = repoPath;
+            params.push(ref);
+        }
+        else {
+            [file, root] = Git.splitPath(fileName, repoPath);
+
+            params.push(ref.endsWith(':') ? `${ref}./${file}` : `${ref}:./${file}`);
+        }
+
         const opts: GitCommandOptions = {
             cwd: root,
             encoding: options.encoding || 'utf8',
             errors: GitErrorHandling.Throw
         };
-        const args = ref.endsWith(':') ? `${ref}./${file}` : `${ref}:./${file}`;
 
         try {
-            const data = await git<TOut>(opts, 'show', args, '--');
+            const data = await git<TOut>(opts, 'show', ...params, '--');
             return data;
         }
         catch (ex) {
@@ -833,7 +853,7 @@ export class Git {
                 return undefined;
             }
 
-            return defaultExceptionHandler(ex, opts, args) as TOut;
+            return defaultExceptionHandler(ex, opts, params) as TOut;
         }
     }
 
